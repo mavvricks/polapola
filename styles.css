@@ -1297,20 +1297,40 @@ input[type="color"]::-webkit-color-swatch {
   }
   
   .header-actions {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    justify-content: flex-start;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(3, 7, 6, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color);
+    padding: 0.75rem 1rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    gap: 0;
+  }
+
+  body {
+    padding-bottom: 80px; /* Space for the fixed bottom nav */
   }
   
   .view-toggle {
     display: flex;
-    width: 100%;
+    width: auto;
+    flex: 1;
+    margin-right: 0.5rem;
   }
+  
   .view-toggle button {
     flex: 1;
     justify-content: center;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+    padding: 0.6rem 0.5rem;
+    font-size: 0.8rem;
   }
   
   .controls-bar {
@@ -1462,6 +1482,16 @@ input[type="color"]::-webkit-color-swatch {
     padding: 0.75rem 1rem;
   }
 
+  .header-actions {
+    padding: 0.5rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+  
+  .action-group {
+    gap: 0.15rem;
+    padding-left: 0.25rem;
+  }
+
   .greeting h1 {
     font-size: 1.1rem;
   }
@@ -1488,6 +1518,18 @@ input[type="color"]::-webkit-color-swatch {
     width: 16px;
     height: 16px;
   }
+
+  .floating-action-btn {
+    width: 50px;
+    height: 50px;
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+    right: 1.25rem;
+  }
+  
+  .floating-action-btn i {
+    width: 22px;
+    height: 22px;
+  }
   
   .calendar-day {
     min-height: 55px;
@@ -1505,7 +1547,8 @@ input[type="color"]::-webkit-color-swatch {
   }
   
   .list-item {
-    padding: 0.5rem 0.6rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
   }
   
   .list-item-title {
