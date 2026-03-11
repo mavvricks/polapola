@@ -4,39 +4,7 @@
  */
 
 // --- 1. State Management ---
-const DEFAULT_SUBJECTS = [
-    { id: 'sub-1', name: 'CompSys', color: '#3b82f6' },
-    { id: 'sub-2', name: 'ProjMan', color: '#f59e0b' },
-    { id: 'sub-3', name: 'HCI', color: '#10b981' },
-    { id: 'sub-4', name: 'SysInt', color: '#8b5cf6' },
-    { id: 'sub-5', name: 'Analytics', color: '#ec4899' },
-    { id: 'sub-6', name: 'E-Commerce', color: '#14b8a6' }
-];
-const DEFAULT_TASKS = [
-    {"title":"SA2 [M5]","type":"due","subject":"sub-1","date":"2026-03-11","desc":"","id":"task-1773121734684","completed":false},
-    {"title":"Mentor Consultation prep (list all revisions and modules)","type":"todo","subject":"sub-2","date":"2026-03-11","desc":"","id":"task-1773121787318"},
-    {"title":"Meeting after class","type":"todo","subject":"sub-3","date":"2026-03-11","desc":"","id":"task-1773121801366"},
-    {"title":"Do data collection and start Chapter 4","type":"todo","subject":"sub-3","date":"2026-03-12","desc":"","id":"task-1773127507508"},
-    {"title":"Finalize Paper and Start Creating Presentation + Script","type":"todo","subject":"sub-3","date":"2026-03-13","desc":"","id":"task-1773127518246"},
-    {"title":"Practice for presentation and defense","type":"todo","subject":"sub-3","date":"2026-03-14","desc":"","id":"task-1773127527955"},
-    {"title":"Finish and Finalize FA5 & FA6","type":"todo","subject":"sub-1","date":"2026-03-14","desc":"","id":"task-1773127539224"},
-    {"title":"Study and Prepare for SA3","type":"todo","subject":"sub-1","date":"2026-03-15","desc":"","id":"task-1773127552446"},
-    {"title":"Finalize final project paper and website","type":"todo","subject":"sub-6","date":"2026-03-16","desc":"","id":"task-1773127563643"},
-    {"title":"Continue Revisions and Finalize if Possible","type":"todo","subject":"sub-2","date":"2026-03-16","desc":"","id":"task-1773127573175"},
-    {"title":"FA5 & FA6 checking","type":"due","subject":"sub-1","date":"2026-03-17","desc":"","id":"task-1773127591933"},
-    {"title":"Final review and practice for SA3 [M6]-[M8]","type":"todo","subject":"sub-1","date":"2026-03-17","desc":"","id":"task-1773127614210"},
-    {"title":"Final proofread of paper before tomorrow's submission","type":"todo","subject":"sub-3","date":"2026-03-17","desc":"","id":"task-1773127651116"},
-    {"title":"Begin drafting the final paper","type":"todo","subject":"sub-4","date":"2026-03-17","desc":"","id":"task-1773127666040"},
-    {"title":"SA3 [M6]-[M8]","type":"due","subject":"sub-1","date":"2026-03-18","desc":"","id":"task-1773127699296"},
-    {"title":"Mentor Consultation","type":"todo","subject":"sub-2","date":"2026-03-18","desc":"","id":"task-1773127714648"},
-    {"title":"Pass final paper","type":"due","subject":"sub-3","date":"2026-03-18","desc":"","id":"task-1773127744175"},
-    {"title":"Final run-through of defense presentation script","type":"todo","subject":"sub-3","date":"2026-03-18","desc":"","id":"task-1773127779637"},
-    {"title":"Defense Presentation","type":"due","subject":"sub-3","date":"2026-03-19","desc":"","id":"task-1773127812396"},
-    {"title":"Final Revised Paper","type":"due","subject":"sub-2","date":"2026-03-24","desc":"","id":"task-1773127844698"},
-    {"title":"Final Paper, Working Deployed Website, Video Presentation","type":"due","subject":"sub-4","date":"2026-03-24","desc":"","id":"task-1773127856240"},
-    {"title":"Revision Progress Report Meeting","type":"todo","subject":"sub-2","date":"2026-03-10","desc":"","id":"task-1773121690762","completed":false},
-    {"title":"Prepare for SA2","type":"todo","subject":"sub-1","date":"2026-03-10","desc":"","id":"task-1773121709319","completed":false}
-];
+// Default configurations removed as data now syncs directly from Google Sheets
 
 // --- Google Sheets Sync ---
 // PASTE YOUR DEPLOYED APPS SCRIPT WEB APP URL BELOW:
@@ -88,8 +56,8 @@ const SheetsSync = {
 
 class StateManager {
     constructor() {
-        this.tasks = JSON.parse(localStorage.getItem('academic_tasks')) || DEFAULT_TASKS;
-        this.subjects = JSON.parse(localStorage.getItem('academic_subjects')) || DEFAULT_SUBJECTS;
+        this.tasks = JSON.parse(localStorage.getItem('academic_tasks')) || [];
+        this.subjects = JSON.parse(localStorage.getItem('academic_subjects')) || [];
         this.settings = JSON.parse(localStorage.getItem('academic_settings')) || { hideCompleted: false };
     }
 
@@ -153,11 +121,18 @@ class StateManager {
     async syncFromSheets() {
         const data = await SheetsSync.pull();
         if (data) {
-            if (data.tasks && data.tasks.length > 0) {
-                this.tasks = data.tasks;
+            if (data.tasks) {
+                // Sanitize dates to ensure YYYY-MM-DD strict matching for Calendar view
+                this.tasks = data.tasks.map(t => {
+                    if (t.date && t.date.includes('T')) {
+                        // Google Sheets APIs might return ISO strings like 2026-03-10T16:00:00.000Z
+                        t.date = t.date.split('T')[0];
+                    }
+                    return t;
+                });
                 this.saveTasks();
             }
-            if (data.subjects && data.subjects.length > 0) {
+            if (data.subjects) {
                 this.subjects = data.subjects;
                 this.saveSubjects();
             }
