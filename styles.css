@@ -75,8 +75,6 @@ body {
 /* Header */
 .app-header {
   background: var(--bg-secondary);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   padding: 1.5rem 2rem;
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -420,7 +418,8 @@ body {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.task-indicator i {
+.task-indicator i,
+.task-indicator svg {
   width: 12px;
   height: 12px;
 }
@@ -1362,17 +1361,15 @@ input[type="color"]::-webkit-color-swatch {
   }
   
   .task-indicator {
-    padding: 0.1rem;
+    padding: 0.15rem 0.25rem;
     border-radius: 2px;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
   }
-  .task-indicator span {
-    display: none;
-  }
-  .task-indicator i {
+
+  .task-indicator i,
+  .task-indicator svg {
     width: 10px;
     height: 10px;
-    margin: 0 auto;
   }
   .day-number {
     font-size: 0.75rem;
