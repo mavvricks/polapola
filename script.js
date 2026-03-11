@@ -169,6 +169,11 @@ function setupEventListeners() {
     if (exportBtn) {
         exportBtn.addEventListener('click', exportCurrentViewToPDF);
     }
+
+    const copyBtn = document.getElementById('btn-copy-tasks');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyTasksToClipboard);
+    }
     
     document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
     document.querySelectorAll('.close-settings').forEach(btn => btn.addEventListener('click', closeSettingsModal));
@@ -746,6 +751,50 @@ function exportCurrentViewToPDF() {
     }).catch(err => {
         console.error("PDF Export Error: ", err);
         showToast('Failed to export PDF', 'error');
+    });
+}
+
+function copyTasksToClipboard() {
+    let tasks = [...getFilteredTasks()].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    if (tasks.length === 0) {
+        showToast('No tasks to copy', 'error');
+        return;
+    }
+    
+    // Group by date
+    const groups = {};
+    tasks.forEach(t => {
+        if (!groups[t.date]) groups[t.date] = [];
+        groups[t.date].push(t);
+    });
+    
+    const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+    let textOutput = '';
+    
+    for (const [dateStr, dateTasks] of Object.entries(groups)) {
+        const dateObj = new Date(dateStr);
+        const offset = dateObj.getTimezoneOffset() * 60000;
+        const corrected = new Date(dateObj.getTime() + offset);
+        const dayName = corrected.toLocaleDateString('en-US', { weekday: 'long' });
+        const displayDate = corrected.toLocaleDateString('en-US', dateOptions);
+        
+        textOutput += `${displayDate} (${dayName})\n`;
+        
+        dateTasks.forEach(t => {
+            const subject = Store.getSubjectById(t.subject);
+            const subjName = subject ? subject.name : 'Task';
+            const done = t.completed ? ' ✅' : '';
+            textOutput += `• ${subjName}: ${t.title}${done}\n`;
+        });
+        
+        textOutput += '\n';
+    }
+    
+    navigator.clipboard.writeText(textOutput.trim()).then(() => {
+        showToast('Tasks copied to clipboard!', 'success');
+    }).catch(() => {
+        showToast('Failed to copy tasks', 'error');
     });
 }
 
