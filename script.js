@@ -8,7 +8,7 @@
 
 // --- Google Sheets Sync ---
 // PASTE YOUR DEPLOYED APPS SCRIPT WEB APP URL BELOW:
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPDtPAYiUV0BGfUrjWwApC93btEvK_t-EFd6P9EvKzlLzkDL-UsguHKJMWav43e6Cj2Q/exec'; // e.g. 'https://script.google.com/macros/s/XXXX/exec'
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxg25q8ED9qFbNMNQE9BvfujISWIaa5P1yu6M3JTs3xxS6ME9ztIqv83ZskuilWC9DO-w/exec'
 
 const SheetsSync = {
     isEnabled() {
@@ -151,9 +151,38 @@ let selectedDateStr = null; // YYYY-MM-DD for modal
 
 let currentWeekOffset = 0; // Pagination state for list view
 
+// --- Format Times Helper ---
+function formatTime(timeStr) {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':');
+    let hours = parseInt(h);
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return `${hours}:${m}${ampm}`;
+}
+
+// Ensure the calendar modal checkboxes work immediately when rendered
+document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('calendar-modal-checkbox')) {
+        const taskId = e.target.dataset.id;
+        const task = Store.tasks.find(t => t.id === taskId);
+        if (task) {
+            task.completed = e.target.checked;
+            Store.updateTask(task);
+            
+            // Re-render the specific modal contents to show crossed-out style instantly
+            refreshDayTasksInModal(task.date);
+            // Re-render behind the modal so calendar grid syncs up
+            renderAll();
+        }
+    }
+});
+
+let currentTaskId = null; // for editing tasks
 let editMode = false;
-let currentTaskId = null;
 let taskToDelete = null;
+let subjectToDelete = null;
 
 // Search & Filter state
 let searchTerm = '';
@@ -326,9 +355,17 @@ function setupEventListeners() {
         saveNewSubject();
     });
     
-    // Settings Add Subject
+    document.getElementById('settings-subjects-list').addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.delete-subject-btn');
+        if (delBtn) {
+            const subId = delBtn.dataset.id;
+            window.executeSubjectDeletion(subId);
+        }
+    });
+
+    // Hook up Add Subject in Settings
     const settingsAddSubjForm = document.getElementById('settings-add-subject-form');
-    if(settingsAddSubjForm) {
+    if (settingsAddSubjForm) {
         settingsAddSubjForm.addEventListener('submit', handleAddSubjectFromSettings);
     }
 
@@ -342,9 +379,7 @@ function setupEventListeners() {
             taskToDelete = null;
             showToast('Task deleted successfully', 'success');
             closeConfirmModal();
-            refreshDayTasksInModal(selectedDateStr);
             renderAll();
-            lucide.createIcons();
         }
     });
     
@@ -639,6 +674,9 @@ function renderCalendar() {
             
             const taskEl = document.createElement('div');
             taskEl.className = 'task-indicator';
+            if (t.completed) {
+                taskEl.classList.add('completed');
+            }
             taskEl.style.backgroundColor = color;
             taskEl.title = t.title;
             // Drag and drop attributes
@@ -1026,6 +1064,11 @@ function openDayModal(dateStr) {
     resetTaskForm();
     
     document.getElementById('day-modal').classList.add('active');
+    
+    setTimeout(() => {
+        const modalBody = document.querySelector('#day-modal .modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
+    }, 10);
 }
 
 function refreshDayTasksInModal(dateStr) {
@@ -1043,18 +1086,46 @@ function refreshDayTasksInModal(dateStr) {
         const subject = Store.getSubjectById(task.subject);
         const sColor = subject ? subject.color : '#ccc';
         const typeCls = task.type === 'due' ? 'due' : 'todo';
+        const isCompleted = task.completed ? 'completed' : '';
+        const isChecked = task.completed ? 'checked' : '';
         
+        let timeRangeHtml = '';
+        if (task.startTime || task.deadlineTime) {
+            const st = task.startTime ? formatTime(task.startTime) : '';
+            const ed = task.deadlineTime ? formatTime(task.deadlineTime) : '';
+            const timeText = (st && ed) ? `${st} - ${ed}` : (st || ed);
+            timeRangeHtml = `<div class="modal-task-time" style="font-size: 0.8rem; color: #4b5563; margin-top: 6px; display: flex; align-items: center; gap: 4px;"><i data-lucide="clock" style="width:14px; height:14px;"></i> ${timeText}</div>`;
+        }
+
+        const descHtml = task.desc ? `<div class="modal-task-desc" style="font-size: 0.8rem; color: #4b5563; margin-top: 8px;">${task.desc}</div>` : '';
+
+        const opac = task.completed ? 'opacity: 0.6;' : '';
+
         const div = document.createElement('div');
-        div.className = `modal-task-item ${typeCls}`;
-        div.style.borderLeftColor = sColor;
+        div.className = `modal-task-item ${typeCls} ${isCompleted}`;
+        div.style.cssText = `background-color: #bdbdbd; border-radius: 8px; border-left: 6px solid ${sColor}; margin-bottom: 1rem; position: relative; overflow: hidden;`;
         div.innerHTML = `
-            <div>
-                <div class="title">${task.title}</div>
-                <div class="subject">${subject ? subject.name : ''}</div>
-            </div>
-            <div class="list-item-actions">
-                <button class="icon-btn edit-btn" data-id="${task.id}"><i data-lucide="edit-2"></i></button>
-                <button class="icon-btn delete-btn" style="color:var(--danger)" data-id="${task.id}"><i data-lucide="trash-2"></i></button>
+            <div style="padding: 1rem; ${opac}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="title" style="font-size: 1.1rem; font-weight: 800; color: #1e1b4b; word-break: break-word; line-height: 1.3; ${task.completed ? 'text-decoration: line-through;' : ''}">${task.title}</div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: -0.25rem;">
+                        <button class="icon-btn edit-btn" data-id="${task.id}" style="color: #4b5563; background: transparent; padding: 4px;"><i data-lucide="edit-2"></i></button>
+                        <button class="icon-btn delete-btn" data-id="${task.id}" style="color: #ef4444; background: transparent; padding: 4px;"><i data-lucide="trash-2"></i></button>
+                    </div>
+                </div>
+                <div class="subject" style="color: ${sColor}; font-weight: 600; font-size: 0.85rem; margin-top: 4px;">${subject ? subject.name : ''}</div>
+                ${timeRangeHtml}
+                ${descHtml}
+                
+                <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: flex-end; align-items: center;">
+                     <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #4b5563; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; margin: 0;">
+                        <span>MARK AS DONE</span>
+                        <div style="width: 18px; height: 18px; border: 2px solid #4b5563; border-radius: 4px; background: rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; position: relative;">
+                            ${task.completed ? '<div style="width: 10px; height: 10px; background: #4b5563; border-radius: 2px;"></div>' : ''}
+                            <input type="checkbox" class="task-checkbox calendar-modal-checkbox" data-id="${task.id}" ${isChecked} style="opacity: 0; position: absolute; inset: 0; cursor: pointer; width: 100%; height: 100%;">
+                        </div>
+                     </label>
+                </div>
             </div>
         `;
         dayTasksList.appendChild(div);
@@ -1096,6 +1167,8 @@ function saveTaskFromForm() {
         type: document.querySelector('input[name="task-type"]:checked').value,
         subject: taskSubj,
         date: document.getElementById('task-date').value,
+        startTime: document.getElementById('task-start-time').value || null,
+        deadlineTime: document.getElementById('task-deadline-time').value || null,
         desc: document.getElementById('task-desc').value.trim()
     };
     
@@ -1119,6 +1192,8 @@ function saveTaskFromForm() {
 function resetTaskForm() {
     document.getElementById('task-form').reset();
     document.getElementById('task-id').value = '';
+    document.getElementById('task-start-time').value = '';
+    document.getElementById('task-deadline-time').value = '';
     document.getElementById('form-heading').textContent = 'Add New Task';
     
     if (selectedDateStr) {
@@ -1144,6 +1219,8 @@ function editTask(id) {
     document.querySelector(`input[name="task-type"][value="${task.type}"]`).checked = true;
     document.getElementById('task-subject').value = task.subject;
     document.getElementById('task-date').value = task.date;
+    document.getElementById('task-start-time').value = task.startTime || '';
+    document.getElementById('task-deadline-time').value = task.deadlineTime || '';
     document.getElementById('task-desc').value = task.desc;
     
     // Ensure form is scrolled into view in modal
@@ -1156,7 +1233,9 @@ function confirmDeleteTask(id) {
     taskToDelete = id;
     const task = Store.tasks.find(t => t.id === id);
     if(task) {
-        document.getElementById('delete-task-name').textContent = `"${task.title}"`;
+        document.getElementById('confirm-modal-title').textContent = 'Delete Task?';
+        document.getElementById('confirm-modal-desc').innerHTML = `Are you sure you want to delete the task <strong>"${task.title}"</strong>? This action cannot be undone.`;
+        document.getElementById('btn-confirm-delete').textContent = 'Delete Task';
     }
     document.getElementById('confirm-modal').classList.add('active');
 }
@@ -1164,6 +1243,7 @@ function confirmDeleteTask(id) {
 function closeConfirmModal() {
     document.getElementById('confirm-modal').classList.remove('active');
     taskToDelete = null;
+    subjectToDelete = null;
 }
 
 // Subject Modal
@@ -1272,7 +1352,7 @@ function renderSettingsSubjects() {
                 <button class="icon-btn" id="btn-save-${sub.id}" onclick="saveSubjectEdits('${sub.id}')" title="Save Changes" style="display:none; color: var(--success);">
                     <i data-lucide="check" style="width:16px; height:16px;"></i>
                 </button>
-                <button class="icon-btn danger-text" onclick="deleteSubject('${sub.id}')" title="Delete Subject">
+                <button class="icon-btn danger-text delete-subject-btn" data-id="${sub.id}" title="Delete Subject">
                     <i data-lucide="trash-2" style="width:16px; height:16px;"></i>
                 </button>
             </div>
@@ -1326,14 +1406,23 @@ window.saveSubjectEdits = function(subId) {
     }
 };
 
-window.deleteSubject = function(subId) {
+window.executeSubjectDeletion = function(subId) {
+    // 1. Check if any tasks are currently using this subject
+    const tasksUsingSubj = Store.tasks.filter(task => task.subject === subId);
+
     if (tasksUsingSubj.length > 0) {
         showToast(`Cannot delete: ${tasksUsingSubj.length} tasks are currently using this subject.`, 'error');
-        return;
+        return; // Stops the deletion
     }
     
+    // 2. Remove the subject from local storage
     Store.subjects = Store.subjects.filter(s => s.id !== subId);
     Store.saveSubjects();
+    
+    // 3. Remove the subject from Google Sheets
+    SheetsSync.post({ action: 'deleteSubject', subjectId: subId });
+    
+    // 4. Update the UI
     populateSubjectDropdowns();
     renderSettingsSubjects();
     renderAll();

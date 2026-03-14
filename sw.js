@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ucandoit-v1';
+const CACHE_NAME = 'ucandoit-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -38,9 +38,16 @@ self.addEventListener('fetch', (event) => {
     // Pass APIs straight through to the network
     return;
   }
+  
+  // Network-first strategy for our assets to ensure updates are seen immediately
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    fetch(event.request).then((networkResponse) => {
+      return caches.open(CACHE_NAME).then((cache) => {
+        cache.put(event.request, networkResponse.clone());
+        return networkResponse;
+      });
+    }).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
